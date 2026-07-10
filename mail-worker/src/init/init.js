@@ -30,8 +30,9 @@ const dbInit = {
 		await this.v2_9DB(c);
 		await this.v3_0DB(c);
 		await this.v3_1DB(c);
-		await this.v3_2DB(c);
-		await settingService.refresh(c);
+				await this.v3_2DB(c);
+				await this.v3_3DB(c);
+				await settingService.refresh(c);
 		return c.text('success');
 	},
 
@@ -75,6 +76,14 @@ const dbInit = {
 
 		try {
 			await c.env.db.prepare(`CREATE INDEX IF NOT EXISTS idx_signature_user ON signature(user_id, is_company);`).run();
+		} catch (e) {
+			console.warn(`跳过字段：${e.message}`);
+		}
+	},
+
+	async v3_3DB(c) {
+		try {
+			await c.env.db.prepare(`ALTER TABLE user ADD COLUMN lang TEXT NOT NULL DEFAULT 'en';`).run();
 		} catch (e) {
 			console.warn(`跳过字段：${e.message}`);
 		}
