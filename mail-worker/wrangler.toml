@@ -1,4 +1,4 @@
-name = "cloud-mail"
+name = "elms-mail"
 main = "src/index.js"
 compatibility_date = "2025-06-04"
 keep_vars = true
@@ -8,16 +8,16 @@ enabled = true
 
 [[d1_databases]]
 binding = "db"				#d1数据库绑定名默认不可修改
-database_name = "cloud-mail-db"		#d1数据库名字
-database_id = "2ad30de1-cefb-4e06-b03f-6e13eef4ccc4"		#d1数据库id
+database_name = "cloud-mail-elmsflo"
+database_id = "3949f8c8-618d-40ee-89dc-e5607186aeca"
 
 [[kv_namespaces]]
 binding = "kv"				#kv绑定名默认不可修改
-id = "2a53a5411bbe480aa03580bbb6853f72"					#kv数据库id
+id = "d64eb31a9a0e487185023b09e28763ca"					#kv数据库id
 
 [[r2_buckets]]
 binding = "r2"				#r2对象存储绑定名默认不可修改
-bucket_name = "cloud-mail-r2"		#r2对象存储桶的名字
+bucket_name = "cloud-mail-elmsflo"		#r2对象存储桶的名字
 
 #[[send_email]]
 #name = "email"			#CF发件, 配置后优先使用
