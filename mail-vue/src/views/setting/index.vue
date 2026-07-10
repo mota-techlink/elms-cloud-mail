@@ -130,9 +130,9 @@ function setName() {
   })
 }
 
-function changeLang(lang) {
-  // sync to server
-  updateLang(lang).catch(() => {});
+async function changeLang(lang) {
+  // sync to server and wait for it to complete
+  await updateLang(lang).catch(() => {});
   // persist locally + reload
   let setting = {}
   try {
