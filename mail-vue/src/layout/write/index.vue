@@ -62,44 +62,47 @@
           </template>
         </el-input-tag>
         <el-input v-model="form.subject" :placeholder="t('subject')" />
-        <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" />
-        <div class="button-item">
-          <div class="att-add" @click="chooseFile">
-            <Icon icon="iconamoon:attachment-fill" width="24" height="24"/>
+        <div class="editor-wrapper">
+          <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" />
+        </div>
+        </div>
+      </div>
+      <div class="button-item">
+        <div class="att-add" @click="chooseFile">
+          <Icon icon="iconamoon:attachment-fill" width="24" height="24"/>
+        </div>
+        <div class="att-clear" @click="clearContent">
+          <Icon icon="icon-park-outline:clear-format" width="24" height="24 "/>
+        </div>
+        <div class="att-list">
+          <div class="att-item" v-for="(item,index) in form.attachments" :key="index">
+            <Icon v-bind="getIconByName(item.filename)"/>
+            <span class="att-filename">{{ item.filename }}</span>
+            <span class="att-size">{{ formatBytes(item.size) }}</span>
+            <Icon style="cursor: pointer;" icon="material-symbols-light:close-rounded" @click="delAtt(index)"
+                  width="22" height="22"/>
           </div>
-          <div class="att-clear" @click="clearContent">
-            <Icon icon="icon-park-outline:clear-format" width="24" height="24 "/>
-          </div>
-          <div class="att-list">
-            <div class="att-item" v-for="(item,index) in form.attachments" :key="index">
-              <Icon v-bind="getIconByName(item.filename)"/>
-              <span class="att-filename">{{ item.filename }}</span>
-              <span class="att-size">{{ formatBytes(item.size) }}</span>
-              <Icon style="cursor: pointer;" icon="material-symbols-light:close-rounded" @click="delAtt(index)"
-                    width="22" height="22"/>
-            </div>
-          </div>
-          <div class="footer-actions">
-            <el-dropdown v-if="signatureStore.items.length" @command="insertSignature">
-              <el-button size="small" type="default">
-                <Icon icon="mdi:signature-text" width="16" height="16" />
-                {{ $t('signature') }}
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item v-for="sig in signatureStore.items" :key="sig.sigId" :command="sig">
-                    {{ sig.name }}
-                    <el-tag size="small" type="info" v-if="sig.isCompany" style="margin-left:4px">{{ $t('company') }}</el-tag>
-                    <el-tag size="small" type="success" v-if="sig.isDefault" style="margin-left:4px">{{ $t('default') }}</el-tag>
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-            <div style="flex:1"></div>
-            <el-button type="primary" @click="sendEmail" v-if="form.sendType === 'reply'">{{ $t('reply') }}</el-button>
-            <el-button type="primary" @click="sendEmail" v-else-if="form.sendType === 'forward'">{{ $t('forward') }}</el-button>
-            <el-button type="primary" @click="sendEmail" v-else>{{ $t('send') }}</el-button>
-          </div>
+        </div>
+        <div class="footer-actions">
+          <el-dropdown v-if="signatureStore.items.length" @command="insertSignature">
+            <el-button size="small" type="default">
+              <Icon icon="mdi:signature-text" width="16" height="16" />
+              {{ $t('signature') }}
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-for="sig in signatureStore.items" :key="sig.sigId" :command="sig">
+                  {{ sig.name }}
+                  <el-tag size="small" type="info" v-if="sig.isCompany" style="margin-left:4px">{{ $t('company') }}</el-tag>
+                  <el-tag size="small" type="success" v-if="sig.isDefault" style="margin-left:4px">{{ $t('default') }}</el-tag>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <div style="flex:1"></div>
+          <el-button type="primary" @click="sendEmail" v-if="form.sendType === 'reply'">{{ $t('reply') }}</el-button>
+          <el-button type="primary" @click="sendEmail" v-else-if="form.sendType === 'forward'">{{ $t('forward') }}</el-button>
+          <el-button type="primary" @click="sendEmail" v-else>{{ $t('send') }}</el-button>
         </div>
       </div>
     </div>
@@ -823,7 +826,7 @@ function close() {
     padding: 15px;
     border-radius: 8px;
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto 1fr auto;
     overflow: hidden;
     @media (max-width: 1024px) {
       width: 100%;
@@ -876,12 +879,13 @@ function close() {
     }
 
     .container {
-      height: 100%;
-      display: grid;
-      grid-template-rows: auto auto auto auto 1fr auto;
-      gap: 15px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
 
-      .item-title {
+        .item-title {
       }
 
       .cc-bcc-input {
@@ -889,9 +893,17 @@ function close() {
         overflow-y: auto;
       }
 
-      .button-item {
+      .editor-wrapper {
+        flex: 1;
+        min-height: 0;
+      }
+    }
+
+    .button-item {
         display: grid;
         grid-template-columns: auto auto 1fr auto;
+        padding-top: 8px;
+        border-top: 1px solid var(--el-border-color-lighter);
 
         .att-add {
           cursor: pointer;
