@@ -38,9 +38,27 @@
             </el-select>
           </template>
           <template #suffix>
-            <div style="display: flex;margin-right: 3px;">
+            <div style="display: flex;margin-right: 3px;align-items: center;gap: 8px;">
+              <span v-if="!showCc" class="cc-bcc-toggle" @click.stop="showCc = true">{{ $t('cc') }}</span>
+              <span v-if="!showBcc" class="cc-bcc-toggle" @click.stop="showBcc = true">{{ $t('bcc') }}</span>
               <Icon icon="fa7-solid:user-plus" width="20" height="20" class="add-contact" @click.stop="openContacts" />
             </div>
+          </template>
+        </el-input-tag>
+        <el-input-tag v-if="showCc" @add-tag="addCcTagChange" tag-type="success" @input="ccInputChange" size="default" v-model="form.ccEmail">
+          <template #prefix>
+            <div class="item-title cc-title">{{ $t('cc') }}</div>
+          </template>
+          <template #suffix>
+            <Icon icon="material-symbols-light:close-rounded" width="18" height="18" class="cc-bcc-close" @click.stop="showCc = false; form.ccEmail = []" />
+          </template>
+        </el-input-tag>
+        <el-input-tag v-if="showBcc" @add-tag="addBccTagChange" tag-type="warning" size="default" v-model="form.bccEmail">
+          <template #prefix>
+            <div class="item-title bcc-title">{{ $t('bcc') }}</div>
+          </template>
+          <template #suffix>
+            <Icon icon="material-symbols-light:close-rounded" width="18" height="18" class="cc-bcc-close" @click.stop="showBcc = false; form.bccEmail = []" />
           </template>
         </el-input-tag>
         <el-input v-model="form.subject" :placeholder="t('subject')" />
@@ -159,6 +177,8 @@ const mySelect = ref()
 let selectStatus = false
 const backReply = reactive({
   receiveEmail: [],
+  ccEmail: [],
+  bccEmail: [],
   subject: '',
   content: '',
   sendType: ''
@@ -166,6 +186,8 @@ const backReply = reactive({
 const form = reactive({
   sendEmail: '',
   receiveEmail: [],
+  ccEmail: [],
+  bccEmail: [],
   accountId: -1,
   name: '',
   subject: '',
@@ -178,6 +200,9 @@ const form = reactive({
 })
 
 const selectRecipientList = ref([])
+
+const showCc = ref(false)
+const showBcc = ref(false)
 
 const contacts = computed(() => writerStore.sendRecipientRecord.map(item => ({email: item})))
 
@@ -266,6 +291,40 @@ function addTagChange(val) {
     }
   })
   if (selectStatus && has) openSelect()
+}
+
+function addCcTagChange(val) {
+  const emails = Array.from(new Set(
+      val.split(/[,，]/).map(item => item.trim()).filter(item => item)
+  ));
+  form.ccEmail.splice(form.ccEmail.length - 1, 1)
+  emails.forEach(email => {
+    if (isEmail(email) && !form.ccEmail.includes(email)) {
+      form.ccEmail.push(email)
+    }
+  })
+}
+
+function addBccTagChange(val) {
+  const emails = Array.from(new Set(
+      val.split(/[,，]/).map(item => item.trim()).filter(item => item)
+  ));
+  form.bccEmail.splice(form.bccEmail.length - 1, 1)
+  emails.forEach(email => {
+    if (isEmail(email) && !form.bccEmail.includes(email)) {
+      form.bccEmail.push(email)
+    }
+  })
+}
+
+function ccInputChange(value) {
+  // auto-suggest for CC field (optional, reusing same record)
+  selectRecipientList.value = writerStore.sendRecipientRecord.filter(item => value && !form.ccEmail.includes(item) && item.startsWith(value)).slice(0, 10);
+}
+
+function bccInputChange(value) {
+  // auto-suggest for BCC field (optional)
+  selectRecipientList.value = writerStore.sendRecipientRecord.filter(item => value && !form.bccEmail.includes(item) && item.startsWith(value)).slice(0, 10);
 }
 
 function clearContent() {
@@ -418,16 +477,19 @@ async function sendEmail() {
 }
 
 function addRecipientRecord() {
+  const allEmails = [...form.receiveEmail, ...form.ccEmail, ...form.bccEmail]
   writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.filter(
-      email => !form.receiveEmail.includes(email)
+      email => !allEmails.includes(email)
   );
 
-  writerStore.sendRecipientRecord.unshift(...form.receiveEmail);
+  writerStore.sendRecipientRecord.unshift(...allEmails);
   writerStore.sendRecipientRecord = writerStore.sendRecipientRecord.slice(0, 500);
 }
 
 function resetForm() {
   form.receiveEmail = []
+  form.ccEmail = []
+  form.bccEmail = []
   form.subject = ''
   form.content = ''
   form.manyType = null
@@ -438,8 +500,12 @@ function resetForm() {
   backReply.content = ''
   backReply.subject = ''
   backReply.receiveEmail = []
+  backReply.ccEmail = []
+  backReply.bccEmail = []
   backReply.sendType = ''
   defValue.value = ''
+  showCc.value = false
+  showBcc.value = false
   editor.value.clearEditor()
 }
 
@@ -472,6 +538,8 @@ function openForward(email) {
       backReply.content = editor.value.getContent()
       backReply.subject = form.subject
       backReply.receiveEmail = form.receiveEmail
+      backReply.ccEmail = [...form.ccEmail]
+      backReply.bccEmail = [...form.bccEmail]
       backReply.sendType = form.sendType
     })
 
@@ -497,13 +565,13 @@ function openReply(email) {
 
   setTimeout(() => {
     defValue.value = `
-    <div></div>
+    <div><div id="email-signature-block"></div></div>
     <div>
     <br>
         ${formatDetailDate(email.createTime)} ${email.name} &lt${email.sendEmail}&gt ${t('wrote')}:
     </div>
     <blockquote class="mceNonEditable" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
-      <articl>
+      <article>
           ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
       </article>
     </blockquote>`
@@ -513,6 +581,8 @@ function openReply(email) {
       backReply.content = editor.value.getContent()
       backReply.subject = form.subject
       backReply.receiveEmail = form.receiveEmail
+      backReply.ccEmail = [...form.ccEmail]
+      backReply.bccEmail = [...form.bccEmail]
       backReply.sendType = form.sendType
     })
   })
@@ -604,10 +674,12 @@ function close() {
     let subjectFlag = form.subject === backReply.subject
     let contentFlag = editor.value.getContent() === backReply.content
     let receiveFlag = form.receiveEmail.length === 1 && form.receiveEmail[0] === backReply.receiveEmail[0]
+    let ccFlag = form.ccEmail.length === 0 || (JSON.stringify(form.ccEmail) === JSON.stringify(backReply.ccEmail))
+    let bccFlag = form.bccEmail.length === 0 || (JSON.stringify(form.bccEmail) === JSON.stringify(backReply.bccEmail))
     if (backReply.sendType === 'forward' && form.receiveEmail.length === 0) {
       receiveFlag = true;
     }
-    if (subjectFlag && contentFlag && receiveFlag) {
+    if (subjectFlag && contentFlag && receiveFlag && ccFlag && bccFlag) {
       resetForm();
       close()
       return;
@@ -821,5 +893,33 @@ function close() {
 
 .icon {
   cursor: pointer;
+}
+
+.cc-bcc-toggle {
+  font-size: 12px;
+  color: var(--el-color-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.cc-bcc-toggle:hover {
+  text-decoration: underline;
+}
+
+.cc-bcc-close {
+  cursor: pointer;
+  color: var(--el-text-color-secondary);
+}
+
+.cc-bcc-close:hover {
+  color: var(--el-text-color-primary);
+}
+
+.cc-title {
+  color: var(--el-color-success);
+}
+
+.bcc-title {
+  color: var(--el-color-warning);
 }
 </style>

@@ -163,6 +163,8 @@ const emailService = {
 			sendType, //发件类型
 			emailId, //邮件id，如果是回复邮件会带
 			receiveEmail, //收件人邮箱
+			ccEmail = [], //抄送邮箱
+			bccEmail = [], //密送邮箱
 			text, //邮件纯文本
 			content, //邮件内容
 			subject, //邮件标题
@@ -182,7 +184,8 @@ const emailService = {
 		const roleRow = await roleService.selectById(c, userRow.type);
 
 		//判断接收方是不是全部为站内邮箱
-		const allInternal = receiveEmail.every(email => {
+		const allReceive = [...receiveEmail, ...ccEmail, ...bccEmail];
+		const allInternal = allReceive.length > 0 && allReceive.every(email => {
 			const domain = '@' + emailUtils.getDomain(email);
 			return domainList.includes(domain);
 		});
@@ -209,7 +212,7 @@ const emailService = {
 				if (roleRow.sendType === 'count') throw new BizError(t('totalSendLimit'), 403);
 			}
 
-			if (userRow.sendCount + receiveEmail.length > roleRow.sendCount) {
+			if (userRow.sendCount + allReceive.length > roleRow.sendCount) {
 				if (roleRow.sendType === 'day') throw new BizError(t('daySendLack'), 403);
 				if (roleRow.sendType === 'count') throw new BizError(t('totalSendLack'), 403);
 			}
@@ -273,6 +276,8 @@ const emailService = {
 					name,
 					accountEmail: accountRow.email,
 					receiveEmail,
+					ccEmail,
+					bccEmail,
 					subject,
 					text,
 					html,
@@ -285,6 +290,8 @@ const emailService = {
 					name,
 					accountEmail: accountRow.email,
 					receiveEmail,
+					ccEmail,
+					bccEmail,
 					subject,
 					text,
 					html,
@@ -315,6 +322,8 @@ const emailService = {
 		emailData.subject = subject;
 		emailData.content = html;
 		emailData.text = text;
+		emailData.cc = JSON.stringify(ccEmail || []);
+		emailData.bcc = JSON.stringify(bccEmail || []);
 		emailData.accountId = accountId;
 		emailData.status = useCloudflareEmail ? emailConst.status.DELIVERED : emailConst.status.SENT;
 		emailData.type = emailConst.type.SEND;
@@ -336,7 +345,7 @@ const emailService = {
 
 		//如果权限有发送次数增加用户发送次数
 		if (roleRow.sendCount && roleRow.sendType !== 'internal') {
-			await userService.incrUserSendCount(c, receiveEmail.length, userId);
+			await userService.incrUserSendCount(c, allReceive.length, userId);
 		}
 
 		//保存到数据库并返回结果
@@ -363,7 +372,8 @@ const emailService = {
 
 		//如果全是站内接收方，直接写入数据库
 		if (allInternal) {
-			await this.HandleOnSiteEmail(c, receiveEmail, emailResult, attList);
+			const allInternalRecipients = [...receiveEmail, ...ccEmail, ...bccEmail];
+			await this.HandleOnSiteEmail(c, allInternalRecipients, receiveEmail, ccEmail, bccEmail, emailResult, attList);
 		}
 
 		const dateStr = dayjs().format('YYYY-MM-DD');
@@ -371,9 +381,9 @@ const emailService = {
 
 		//记录每天发件次数统计
 		if (!daySendTotal) {
-			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(receiveEmail.length), { expirationTtl: 60 * 60 * 24 });
+			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(allReceive.length), { expirationTtl: 60 * 60 * 24 });
 		} else  {
-			daySendTotal = Number(daySendTotal) + receiveEmail.length
+			daySendTotal = Number(daySendTotal) + allReceive.length
 			await c.env.kv.put(kvConst.SEND_DAY_COUNT + dateStr, JSON.stringify(daySendTotal), { expirationTtl: 60 * 60 * 24 });
 		}
 
@@ -386,6 +396,14 @@ const emailService = {
 			to: [...params.receiveEmail],
 			subject: params.subject
 		};
+
+		if (params.ccEmail && params.ccEmail.length > 0) {
+			sendForm.cc = [...params.ccEmail];
+		}
+
+		if (params.bccEmail && params.bccEmail.length > 0) {
+			sendForm.bcc = [...params.bccEmail];
+		}
 
 		if (params.text) {
 			sendForm.text = params.text;
@@ -427,6 +445,14 @@ const emailService = {
 			html: params.html,
 			attachments: await this.toResendAttachments(params.attachments)
 		};
+
+		if (params.ccEmail && params.ccEmail.length > 0) {
+			sendForm.cc = [...params.ccEmail];
+		}
+
+		if (params.bccEmail && params.bccEmail.length > 0) {
+			sendForm.bcc = [...params.bccEmail];
+		}
 
 		if (params.sendType === 'reply') {
 			sendForm.headers = {
@@ -546,12 +572,12 @@ const emailService = {
 	},
 
 	//处理站内邮件发送
-	async HandleOnSiteEmail(c, receiveEmail, sendEmailData, attList) {
+	async HandleOnSiteEmail(c, allRecipients, toEmail, ccEmail, bccEmail, sendEmailData, attList) {
 
 		const { noRecipient  } = await settingService.query(c);
 
 		//查询所有收件人账号信息
-		let accountList = await orm(c).select().from(account).where(inArray(account.email, receiveEmail)).all();
+		let accountList = await orm(c).select().from(account).where(inArray(account.email, allRecipients)).all();
 
 		//查询所有收件人权限身份
 		const userIds = accountList.map(accountRow => accountRow.userId);
@@ -560,7 +586,7 @@ const emailService = {
 		//封装数据库准备保存到数据库
 		const emailDataList = [];
 
-		for (const email of receiveEmail) {
+		for (const email of allRecipients) {
 
 			//把发件人邮件改成收件
 			const emailValues = {...sendEmailData}
