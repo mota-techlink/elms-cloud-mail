@@ -192,6 +192,8 @@ function replaceSignature(htmlContent) {
   });
   // 2. Remove <font color="..."> and bgcolor attributes
   cleaned = cleaned.replace(/\s(?:color|bgcolor)\s*=\s*("[^"]*"|'[^']*')/gi, '');
+  // 3. Strip <style> tags — they would affect the entire editor in dark mode
+  cleaned = cleaned.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
   // Find by unique ID — never touches anything outside the signature block
   const existing = dom.select('#email-signature-block');
   if (existing.length > 0) {
