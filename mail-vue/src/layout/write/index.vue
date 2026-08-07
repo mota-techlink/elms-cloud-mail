@@ -833,6 +833,8 @@ function close() {
       border-radius: 0;
       border: 0;
       padding-top: 10px;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
 
     @media (min-width: 1025px) {
@@ -903,11 +905,6 @@ function close() {
         grid-template-columns: auto auto 1fr auto;
         padding-top: 8px;
         border-top: 1px solid var(--el-border-color-lighter);
-        @media (max-width: 600px) {
-          grid-template-columns: 1fr auto;
-          grid-template-rows: auto auto;
-          gap: 8px;
-        }
 
         .att-add {
           cursor: pointer;
@@ -926,9 +923,6 @@ function close() {
           padding-right: 10px;
           max-height: 110px;
           overflow-y: auto;
-          @media (max-width: 600px) {
-            grid-column: 1 / -1;
-          }
           @media (max-width: 450px) {
             grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
           }

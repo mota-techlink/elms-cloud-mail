@@ -182,13 +182,21 @@ function insertContent(content) {
 function replaceSignature(htmlContent) {
   if (!editor.value) return;
   const dom = editor.value.dom;
-  // Find by unique ID — never touches anything outside the signature block
+  // Strip inline color/bgcolor styles so theme takes over
+  const cleaned = (htmlContent || '').replace(/\sstyle\s*=\s*"[^"]*"/gi, (m) => {
+    let s = m.replace(/color\s*:\s*[^;"']+;?/gi, '');
+    s = s.replace(/background-color\s*:\s*[^;"']+;?/gi, '');
+    s = s.replace(/background\s*:\s*[^;"']+;?/gi, '');
+    // If style is now empty, remove the attribute entirely
+    return s.replace(/style\s*=\s*"\s*"/gi, '').replace(/style\s*=\s*""/gi, '');
+  });
+  // Find by unique ID — never touches anything outside signature block
   const existing = dom.select('#email-signature-block');
   if (existing.length > 0) {
-    existing[0].innerHTML = htmlContent || '';
+    existing[0].innerHTML = cleaned || '';
   } else {
     // First time: insert signature block at end
-    const sigHtml = '<div id="email-signature-block">' + (htmlContent || '') + '</div>';
+    const sigHtml = '<div id="email-signature-block">' + (cleaned || '') + '</div>';
     editor.value.selection.select(editor.value.getBody(), true);
     editor.value.selection.collapse(false);
     editor.value.insertContent(sigHtml, {format: 'html'});
