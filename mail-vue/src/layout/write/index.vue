@@ -945,7 +945,6 @@ function close() {
     }
   }
 
-}
 
 .email-row {
   white-space: nowrap;
