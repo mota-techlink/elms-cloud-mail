@@ -65,7 +65,6 @@
         <div class="editor-wrapper">
           <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" />
         </div>
-        </div>
       </div>
       <div class="button-item">
         <div class="att-add" @click="chooseFile">
