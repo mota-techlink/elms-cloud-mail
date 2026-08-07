@@ -182,15 +182,18 @@ function insertContent(content) {
 function replaceSignature(htmlContent) {
   if (!editor.value) return;
   const dom = editor.value.dom;
-  // Strip inline color/bgcolor styles so theme takes over
-  const cleaned = (htmlContent || '').replace(/\sstyle\s*=\s*"[^"]*"/gi, (m) => {
+  let cleaned = htmlContent || '';
+  // 1. Strip inline color/bgcolor from style="..." and style='...'
+  cleaned = cleaned.replace(/\sstyle\s*=\s*("[^"]*"|'[^']*')/gi, (m) => {
     let s = m.replace(/color\s*:\s*[^;"']+;?/gi, '');
     s = s.replace(/background-color\s*:\s*[^;"']+;?/gi, '');
     s = s.replace(/background\s*:\s*[^;"']+;?/gi, '');
-    // If style is now empty, remove the attribute entirely
-    return s.replace(/style\s*=\s*"\s*"/gi, '').replace(/style\s*=\s*""/gi, '');
+    s = s.replace(/style\s*=\s*(?:"\s*"|'\s*')/gi, '');
+    return s;
   });
-  // Find by unique ID — never touches anything outside signature block
+  // 2. Remove <font color="..."> and bgcolor attributes
+  cleaned = cleaned.replace(/\s(?:color|bgcolor)\s*=\s*("[^"]*"|'[^']*')/gi, '');
+  // Find by unique ID — never touches anything outside the signature block
   const existing = dom.select('#email-signature-block');
   if (existing.length > 0) {
     existing[0].innerHTML = cleaned || '';
