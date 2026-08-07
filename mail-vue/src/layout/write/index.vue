@@ -45,7 +45,7 @@
             </div>
           </template>
         </el-input-tag>
-        <el-input-tag v-if="showCc" @add-tag="addCcTagChange" tag-type="success" @input="ccInputChange" size="default" v-model="form.ccEmail">
+        <el-input-tag v-if="showCc" @add-tag="addCcTagChange" tag-type="success" @input="ccInputChange" size="default" v-model="form.ccEmail" class="cc-bcc-input">
           <template #prefix>
             <div class="item-title cc-title">{{ $t('cc') }}</div>
           </template>
@@ -53,7 +53,7 @@
             <Icon icon="material-symbols-light:close-rounded" width="18" height="18" class="cc-bcc-close" @click.stop="showCc = false; form.ccEmail = []" />
           </template>
         </el-input-tag>
-        <el-input-tag v-if="showBcc" @add-tag="addBccTagChange" tag-type="warning" size="default" v-model="form.bccEmail">
+        <el-input-tag v-if="showBcc" @add-tag="addBccTagChange" tag-type="warning" size="default" v-model="form.bccEmail" class="cc-bcc-input">
           <template #prefix>
             <div class="item-title bcc-title">{{ $t('bcc') }}</div>
           </template>
@@ -153,6 +153,7 @@ import {ElMessageBox} from "element-plus";
 defineExpose({
   open,
   openReply,
+  openReplyAll,
   openForward,
   openDraft
 })
@@ -565,7 +566,8 @@ function openReply(email) {
 
   setTimeout(() => {
     defValue.value = `
-    <div><div id="email-signature-block"></div></div>
+    <div></div>
+    <div id="email-signature-block"></div>
     <div>
     <br>
         ${formatDetailDate(email.createTime)} ${email.name} &lt${email.sendEmail}&gt ${t('wrote')}:
@@ -589,10 +591,86 @@ function openReply(email) {
 
 }
 
+function openReplyAll(email) {
+
+  resetForm();
+
+  email.subject = email.subject || ''
+
+  // To: original sender
+  form.receiveEmail.push(email.sendEmail)
+
+  // CC: all other recipients from original email (excluding sender and current user)
+  const recipients = parseEmailRecipients(email.recipient)
+  const ccFromOriginal = parseEmailRecipients(email.cc)
+  
+  // Collect all original recipients except the sender
+  const senderEmail = email.sendEmail
+  const allOriginalRecipients = [...recipients, ...ccFromOriginal].filter(
+    addr => addr && addr !== senderEmail
+  )
+  
+  // Add unique recipients to CC
+  const uniqueCc = [...new Set(allOriginalRecipients)]
+  form.ccEmail = uniqueCc
+  if (uniqueCc.length > 0) {
+    showCc.value = true
+  }
+
+  form.subject = (
+      email.subject.startsWith('Re:') ||
+      email.subject.startsWith('Re：') ||
+      email.subject.startsWith('回复：') ||
+      email.subject.startsWith('回复:')) ? email.subject : 'Re: ' + email.subject
+  form.sendType = 'reply'
+  form.emailId = email.emailId
+
+  defValue.value = ''
+
+  setTimeout(() => {
+    defValue.value = `
+    <div></div>
+    <div id="email-signature-block"></div>
+    <div>
+    <br>
+        ${formatDetailDate(email.createTime)} ${email.name} &lt${email.sendEmail}&gt ${t('wrote')}:
+    </div>
+    <blockquote class="mceNonEditable" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
+      <article>
+          ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+      </article>
+    </blockquote>`
+    open()
+
+    nextTick(() => {
+      backReply.content = editor.value.getContent()
+      backReply.subject = form.subject
+      backReply.receiveEmail = [...form.receiveEmail]
+      backReply.ccEmail = [...form.ccEmail]
+      backReply.bccEmail = [...form.bccEmail]
+      backReply.sendType = form.sendType
+    })
+  })
+
+}
+
 function formatImage(content) {
   content = content || '';
   const domain = settingStore.settings.r2Domain;
   return content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
+}
+
+function parseEmailRecipients(recipientStr) {
+  if (!recipientStr) return []
+  try {
+    const parsed = typeof recipientStr === 'string' ? JSON.parse(recipientStr) : recipientStr
+    if (Array.isArray(parsed)) {
+      return parsed.map(item => item.address || item).filter(Boolean)
+    }
+  } catch (e) {
+    return []
+  }
+  return []
 }
 
 function open() {
@@ -800,10 +878,15 @@ function close() {
     .container {
       height: 100%;
       display: grid;
-      grid-template-rows: auto auto 1fr auto;
+      grid-template-rows: auto auto auto auto 1fr auto;
       gap: 15px;
 
       .item-title {
+      }
+
+      .cc-bcc-input {
+        max-height: 52px;
+        overflow-y: auto;
       }
 
       .button-item {

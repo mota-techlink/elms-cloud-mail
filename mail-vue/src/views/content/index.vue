@@ -18,6 +18,9 @@
       <el-tooltip :content="$t('reply')" placement="bottom" effect="dark">
         <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReply" icon="la:reply" width="21" height="21" />
       </el-tooltip>
+      <el-tooltip :content="$t('replyAll')" placement="bottom" effect="dark">
+        <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openReplyAll" icon="material-symbols:reply-all" width="21" height="21" />
+      </el-tooltip>
       <el-tooltip :content="$t('forward')" placement="bottom" effect="dark">
         <Icon class="icon" v-if="emailStore.contentData.showReply" v-perm="'email:send'"  @click="openForward" icon="iconoir:arrow-up-right" width="20" height="20" />
       </el-tooltip>
@@ -231,6 +234,10 @@ onUnmounted(() => {
 
 function openReply() {
   uiStore.writerRef.openReply(email)
+}
+
+function openReplyAll() {
+  uiStore.writerRef.openReplyAll(email)
 }
 
 function openForward() {
