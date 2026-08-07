@@ -19,7 +19,6 @@ defineExpose({
   insertContent,
   replaceSignature
 })
-
 const props = defineProps({
   defValue: {
     type: String,
@@ -185,9 +184,9 @@ function replaceSignature(htmlContent) {
   let cleaned = htmlContent || '';
   // 1. Strip inline color/bgcolor from style="..." and style='...'
   cleaned = cleaned.replace(/\sstyle\s*=\s*("[^"]*"|'[^']*')/gi, (m) => {
-    let s = m.replace(/color\s*:\s*[^;"']+;?/gi, '');
-    s = s.replace(/background-color\s*:\s*[^;"']+;?/gi, '');
-    s = s.replace(/background\s*:\s*[^;"']+;?/gi, '');
+    let s = m.replace(/color\s*:\s*[^;"]+;?/gi, '');
+    s = s.replace(/background-color\s*:\s*[^;"]+;?/gi, '');
+    s = s.replace(/background\s*:\s*[^;"]+;?/gi, '');
     s = s.replace(/style\s*=\s*(?:"\s*"|'\s*')/gi, '');
     return s;
   });
@@ -203,6 +202,30 @@ function replaceSignature(htmlContent) {
     editor.value.selection.select(editor.value.getBody(), true);
     editor.value.selection.collapse(false);
     editor.value.insertContent(sigHtml, {format: 'html'});
+  }
+  // 3. Forcefully strip colors from signature block via DOM walk
+  const block = dom.select('#email-signature-block')[0];
+  if (block) {
+    const walk = (node) => {
+      if (node.nodeType === 1) {
+        node.style.color = '';
+        node.style.backgroundColor = '';
+        node.style.background = '';
+        node.removeAttribute('color');
+        node.removeAttribute('bgcolor');
+        if (node.hasAttribute('style')) {
+          let s = node.getAttribute('style');
+          s = s.replace(/color\s*:\s*[^;]+;?/gi, '');
+          s = s.replace(/background-color\s*:\s*[^;]+;?/gi, '');
+          s = s.replace(/background\s*:\s*[^;]+;?/gi, '');
+          s = s.trim();
+          if (s) node.setAttribute('style', s);
+          else node.removeAttribute('style');
+        }
+        Array.from(node.children).forEach(walk);
+      }
+    };
+    walk(block);
   }
 }
 
