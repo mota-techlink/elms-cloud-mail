@@ -390,21 +390,25 @@ const handleDelete = () => {
   padding: 9px 15px 8px;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 20px 6px;
   box-shadow: var(--header-actions-border);
   font-size: 18px;
+  flex-wrap: wrap;
   .star {
     display: flex;
     align-items: center;
     justify-content: center;
     min-width: 21px;
+    flex-shrink: 0;
   }
   .icon {
     cursor: pointer;
+    flex-shrink: 0;
   }
   .label-btn {
     display: inline-flex;
     align-items: center;
+    flex-shrink: 0;
   }
 }
 
