@@ -56,11 +56,13 @@ const signatureService = {
 			set.name = name;
 		}
 		if (params.content !== undefined) set.content = String(params.content);
-		if (params.isDefault !== undefined && !exist.isCompany) {
+		if (params.isDefault !== undefined) {
 			set.isDefault = params.isDefault ? 1 : 0;
 			if (set.isDefault) {
-				await orm(c).update(signature).set({ isDefault: 0 })
-					.where(and(eq(signature.userId, exist.userId), eq(signature.isCompany, 0))).run();
+				const defaultScope = exist.isCompany
+					? eq(signature.isCompany, 1)
+					: and(eq(signature.userId, exist.userId), eq(signature.isCompany, 0));
+				await orm(c).update(signature).set({ isDefault: 0 }).where(defaultScope).run();
 			}
 		}
 		if (Object.keys(set).length === 0) return;
@@ -85,8 +87,12 @@ const signatureService = {
 		const name = String(params.name || '').trim();
 		const content = String(params.content || '');
 		if (!name) throw new BizError(t('signatureNameRequired') || 'name required');
+		const isDefault = params.isDefault ? 1 : 0;
+		if (isDefault) {
+			await orm(c).update(signature).set({ isDefault: 0 }).where(eq(signature.isCompany, 1)).run();
+		}
 		const row = await orm(c).insert(signature).values({
-			userId: 0, name, content, isDefault: 0, isCompany: 1
+			userId: 0, name, content, isDefault, isCompany: 1
 		}).returning().get();
 		return row;
 	},
@@ -94,11 +100,22 @@ const signatureService = {
 	async setDefault(c, params, user) {
 		const id = Number(params.sigId);
 		const userId = user.userId;
+		if (!id) {
+			await orm(c).update(signature).set({ isDefault: 0 })
+				.where(and(eq(signature.userId, userId), eq(signature.isCompany, 0))).run();
+			return;
+		}
+		const exist = await orm(c).select().from(signature).where(eq(signature.sigId, id)).get();
+		if (!exist) return;
+		if (exist.isCompany) {
+			if (!isAdminUser(c, user)) throw new BizError(t('unauthorized'), 403);
+			await orm(c).update(signature).set({ isDefault: 0 }).where(eq(signature.isCompany, 1)).run();
+			await orm(c).update(signature).set({ isDefault: 1 }).where(eq(signature.sigId, id)).run();
+			return;
+		}
+		if (exist.userId !== userId) return;
 		await orm(c).update(signature).set({ isDefault: 0 })
 			.where(and(eq(signature.userId, userId), eq(signature.isCompany, 0))).run();
-		if (!id) return;
-		const exist = await orm(c).select().from(signature).where(eq(signature.sigId, id)).get();
-		if (!exist || exist.isCompany || exist.userId !== userId) return;
 		await orm(c).update(signature).set({ isDefault: 1 }).where(eq(signature.sigId, id)).run();
 	}
 };

@@ -181,14 +181,15 @@ function replaceSignature(htmlContent) {
   // Find by unique ID — never touches anything outside the signature block
   const existing = dom.select('#email-signature-block');
   if (existing.length > 0) {
+    existing[0].setAttribute('data-email-signature', 'inserted');
     existing[0].innerHTML = htmlContent || '';
-  } else {
-    // First time: insert signature block at end
-    const sigHtml = '<div id="email-signature-block">' + (htmlContent || '') + '</div>';
-    editor.value.selection.select(editor.value.getBody(), true);
-    editor.value.selection.collapse(false);
-    editor.value.insertContent(sigHtml, {format: 'html'});
+    return;
   }
+
+  const sigHtml = '<div id="email-signature-block" data-email-signature="inserted">' + (htmlContent || '') + '</div>';
+  editor.value.selection.select(editor.value.getBody(), true);
+  editor.value.selection.collapse(false);
+  editor.value.insertContent(sigHtml, {format: 'html'});
 }
 
 

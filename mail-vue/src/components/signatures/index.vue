@@ -72,7 +72,7 @@
               :placeholder="'<p>Best,<br>John Doe</p>'"
           />
         </el-form-item>
-        <el-form-item v-if="!form.isCompany">
+        <el-form-item>
           <el-checkbox v-model="form.isDefault">{{ $t('signatureSetDefault') }}</el-checkbox>
         </el-form-item>
         <el-form-item v-if="form.content">
@@ -138,12 +138,13 @@ async function submit() {
         name: form.name.trim(),
         content: form.content || ''
       };
-      if (!form.isCompany) payload.isDefault = form.isDefault ? 1 : 0;
+      payload.isDefault = form.isDefault ? 1 : 0;
       await signatureStore.update(payload);
     } else if (form.isCompany) {
       await signatureStore.addCompany({
         name: form.name.trim(),
-        content: form.content || ''
+        content: form.content || '',
+        isDefault: form.isDefault ? 1 : 0
       });
     } else {
       await signatureStore.add({
