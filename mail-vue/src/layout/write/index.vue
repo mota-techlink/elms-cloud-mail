@@ -15,7 +15,15 @@
         </div>
       </div>
       <div class="container">
-        <el-input-tag  @add-tag="addTagChange" tag-type="primary" @input="inputChange" size="default" v-model="form.receiveEmail" >
+        <el-input-tag
+            ref="recipientInputTagRef"
+            :delimiter="/[;；,，]/"
+            @add-tag="addTagChange"
+            tag-type="primary"
+            @input="inputChange"
+            size="default"
+            v-model="form.receiveEmail"
+        >
           <template #prefix>
             <div class="item-title" >{{ $t('recipient') }}</div>
             <el-select
@@ -44,7 +52,7 @@
           </template>
         </el-input-tag>
         <el-input v-model="form.subject" :placeholder="t('subject')" />
-        <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" />
+        <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" @init="onEditorInit" />
         <div class="button-item">
           <div class="att-add" @click="chooseFile">
             <Icon icon="iconamoon:attachment-fill" width="24" height="24"/>
@@ -147,6 +155,7 @@ const emailStore = useEmailStore();
 const accountStore = useAccountStore()
 const signatureStore = useSignatureStore();
 const editor = ref({})
+const recipientInputTagRef = ref()
 const userStore = useUserStore();
 const show = ref(false);
 const percent = ref(0)
@@ -224,8 +233,19 @@ function clearSelectContact() {
   contactsTabRef.value.clearSelection();
 }
 
+function clearRecipientNativeInput() {
+  const inputEl = recipientInputTagRef.value?.$el?.querySelector('input');
+  if (inputEl && inputEl.value) {
+    inputEl.value = '';
+    inputEl.dispatchEvent(new Event('input'));
+  }
+}
+
 function selectChange(value) {
-  form.receiveEmail.push(value)
+  if (value && isEmail(value) && !form.receiveEmail.includes(value)) {
+    form.receiveEmail.push(value);
+  }
+  clearRecipientNativeInput();
 }
 
 function selectStatusChange(status) {
@@ -237,15 +257,23 @@ const openSelect = () => {
 }
 
 function inputChange(value) {
-  const normalized = splitRecipientInput(value);
-  if (value && /[;；]/.test(value) && normalized.length > 0) {
-    const lastIndex = form.receiveEmail.length > 0 && !isEmail(form.receiveEmail[form.receiveEmail.length - 1])
-      ? form.receiveEmail.length - 1
-      : form.receiveEmail.length;
-    form.receiveEmail.splice(lastIndex, form.receiveEmail.length - lastIndex);
-    normalized.forEach(email => {
-      if (!form.receiveEmail.includes(email)) form.receiveEmail.push(email);
+  if (!value) {
+    selectRecipientList.value = [];
+    return;
+  }
+
+  if (/[;；,，]/.test(value)) {
+    const rawTokens = value.split(/[;；,，]+/).map(s => s.trim()).filter(Boolean);
+    const validEmails = rawTokens.filter(isEmail);
+    validEmails.forEach(email => {
+      if (!form.receiveEmail.includes(email)) {
+        form.receiveEmail.push(email);
+      }
     });
+
+    clearRecipientNativeInput();
+    selectRecipientList.value = [];
+    if (selectStatus) openSelect();
     return;
   }
 
@@ -262,30 +290,35 @@ function inputChange(value) {
 }
 
 function splitRecipientInput(value) {
+  if (Array.isArray(value)) {
+    return Array.from(new Set(
+      value
+        .flatMap(item => String(item || '').split(/[;；,，]+/))
+        .map(item => item.trim())
+        .filter(item => item && isEmail(item))
+    ));
+  }
   return Array.from(new Set(
     String(value || '')
       .split(/[;；,，]+/)
       .map(item => item.trim())
-      .filter(item => item)
-      .filter(item => isEmail(item))
+      .filter(item => item && isEmail(item))
   ));
 }
 
 function addTagChange(val) {
-  const emails = splitRecipientInput(val);
-
-  if (form.receiveEmail.length > 0 && !isEmail(form.receiveEmail[form.receiveEmail.length - 1])) {
-    form.receiveEmail.splice(form.receiveEmail.length - 1, 1);
-  }
-
-  let has = false;
-  emails.forEach(email => {
-    if (!form.receiveEmail.includes(email)) {
-      form.receiveEmail.push(email)
-      has = true
-    }
-  })
-  if (selectStatus && has) openSelect()
+  const cleaned = [];
+  form.receiveEmail.forEach(item => {
+    const split = splitRecipientInput(item);
+    split.forEach(email => {
+      if (!cleaned.includes(email)) {
+        cleaned.push(email);
+      }
+    });
+  });
+  form.receiveEmail.splice(0, form.receiveEmail.length, ...cleaned);
+  clearRecipientNativeInput();
+  if (selectStatus) openSelect();
 }
 
 function clearContent() {
@@ -472,16 +505,29 @@ function focusChange() {
   if (selectStatus) openSelect()
 }
 
+function onEditorInit() {
+  if (show.value && !form.draftId) {
+    applyDefaultSignature();
+  }
+}
+
 function hasInsertedSignature(content = '') {
-  return /id=["']email-signature-block["']/.test(content) || /data-email-signature=["']inserted["']/.test(content)
+  return /id=["']email-signature-block["']/.test(content) || /data-email-signature=["']inserted["']/.test(content);
 }
 
 function applyDefaultSignature() {
+  if (form.draftId) return;
   const def = signatureStore.defaultSignature;
-  if (!def || !String(def.content || '').trim() || !editor.value || hasInsertedSignature(editor.value.getContent())) return;
+  if (!def || !String(def.content || '').trim()) return;
+
+  const currentContent = (editor.value?.getContent ? editor.value.getContent() : defValue.value) || '';
+  if (hasInsertedSignature(currentContent)) return;
+
   nextTick(() => {
-    if (editor.value && !hasInsertedSignature(editor.value.getContent())) {
-      editor.value.replaceSignature(def.content || '');
+    if (form.draftId) return;
+    const freshContent = (editor.value?.getContent ? editor.value.getContent() : '') || '';
+    if (!hasInsertedSignature(freshContent)) {
+      editor.value?.replaceSignature?.(def.content || '');
     }
   });
 }
@@ -489,68 +535,58 @@ function applyDefaultSignature() {
 function openForward(email) {
   resetForm();
 
-  email.subject = email.subject || ''
+  email.subject = email.subject || '';
 
-  form.subject = email.subject
-  form.sendType = 'forward'
+  form.subject = email.subject;
+  form.sendType = 'forward';
 
-  defValue.value = ''
+  defValue.value = `
+    ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+  `;
+  open();
 
-  setTimeout(() => {
-    defValue.value = `
-      ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
-    `
-    open()
-
-    nextTick(() => {
-      backReply.content = editor.value.getContent()
-      backReply.subject = form.subject
-      backReply.receiveEmail = form.receiveEmail
-      backReply.sendType = form.sendType
-    })
-
+  nextTick(() => {
+    backReply.content = editor.value?.getContent?.() || '';
+    backReply.subject = form.subject;
+    backReply.receiveEmail = form.receiveEmail;
+    backReply.sendType = form.sendType;
   });
 }
 
 function openReply(email) {
-
   resetForm();
 
-  email.subject = email.subject || ''
+  email.subject = email.subject || '';
 
-  form.receiveEmail.push(email.sendEmail)
+  form.receiveEmail.push(email.sendEmail);
   form.subject = (
       email.subject.startsWith('Re:') ||
       email.subject.startsWith('Re：') ||
       email.subject.startsWith('回复：') ||
-      email.subject.startsWith('回复:')) ? email.subject : 'Re: ' + email.subject
-  form.sendType = 'reply'
-  form.emailId = email.emailId
+      email.subject.startsWith('回复:')) ? email.subject : 'Re: ' + email.subject;
+  form.sendType = 'reply';
+  form.emailId = email.emailId;
 
-  defValue.value = ''
+  defValue.value = `
+  <div></div>
+  <div>
+  <br>
+      ${formatDetailDate(email.createTime)} ${email.name} &lt;${email.sendEmail}&gt; ${t('wrote')}:
+  </div>
+  <blockquote class="mceNonEditable" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
+    <article>
+        ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
+    </article>
+  </blockquote>`;
 
-  setTimeout(() => {
-    defValue.value = `
-    <div></div>
-    <div>
-    <br>
-        ${formatDetailDate(email.createTime)} ${email.name} &lt${email.sendEmail}&gt ${t('wrote')}:
-    </div>
-    <blockquote class="mceNonEditable" style="margin: 0 0 0 0.8ex;border-left: 1px solid rgb(204,204,204);padding-left: 1ex;">
-      <articl>
-          ${formatImage(email.content) || `<pre style="font-family: inherit;word-break: break-word;white-space: pre-wrap;margin: 0">${email.text}</pre>`}
-      </article>
-    </blockquote>`
-    open()
+  open();
 
-    nextTick(() => {
-      backReply.content = editor.value.getContent()
-      backReply.subject = form.subject
-      backReply.receiveEmail = form.receiveEmail
-      backReply.sendType = form.sendType
-    })
-  })
-
+  nextTick(() => {
+    backReply.content = editor.value?.getContent?.() || '';
+    backReply.subject = form.subject;
+    backReply.receiveEmail = form.receiveEmail;
+    backReply.sendType = form.sendType;
+  });
 }
 
 function formatImage(content) {
@@ -575,22 +611,24 @@ function open() {
   }
 
   signatureStore.fetch().then(() => {
-    applyDefaultSignature();
+    if (!form.draftId) {
+      applyDefaultSignature();
+    }
   });
   show.value = true;
-  editor.value.focus()
+  editor.value?.focus?.();
 }
 
 function insertSignature(sig) {
-  editor.value.replaceSignature && editor.value.replaceSignature(sig.content || '');
+  editor.value?.replaceSignature?.(sig.content || '');
 }
 
 function openDraft(draft) {
-  Object.assign(form, {...draft})
-  defValue.value = ''
-  setTimeout(() => defValue.value = form.content)
+  resetForm();
+  Object.assign(form, {...draft});
+  defValue.value = form.content || '';
   show.value = true;
-  editor.value.focus()
+  editor.value?.focus?.();
 }
 
 const handleKeyDown = (event) => {
