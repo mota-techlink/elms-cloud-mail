@@ -83,6 +83,7 @@ describe('issue #3 and #5 helpers', () => {
 
 	it('detects whether an inserted signature block already exists', () => {
 		expect(hasSignatureBlockMarkup('<div id="email-signature-block" data-email-signature="inserted"></div>')).toBe(true);
+		expect(hasSignatureBlockMarkup('<div id="email-signature-block"></div><blockquote>quoted message</blockquote>')).toBe(false);
 		expect(hasSignatureBlockMarkup('<p>hello</p>')).toBe(false);
 	});
 });
