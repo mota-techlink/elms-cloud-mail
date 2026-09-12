@@ -15,7 +15,7 @@
         </div>
       </div>
       <div class="container">
-        <el-input-tag  @add-tag="addTagChange" tag-type="primary" @input="inputChange" size="default" v-model="form.receiveEmail" >
+        <el-input-tag ref="recipientInputTagRef" :delimiter="/[;；,，]/" @add-tag="addTagChange" tag-type="primary" @input="inputChange" size="default" v-model="form.receiveEmail" >
           <template #prefix>
             <div class="item-title" >{{ $t('recipient') }}</div>
             <el-select
@@ -45,7 +45,7 @@
             </div>
           </template>
         </el-input-tag>
-        <el-input-tag v-if="showCc" @add-tag="addCcTagChange" tag-type="success" @input="ccInputChange" size="default" v-model="form.ccEmail" class="cc-bcc-input">
+        <el-input-tag v-if="showCc" ref="ccInputTagRef" :delimiter="/[;；,，]/" @add-tag="addCcTagChange" tag-type="success" @input="ccInputChange" size="default" v-model="form.ccEmail" class="cc-bcc-input">
           <template #prefix>
             <div class="item-title cc-title">{{ $t('cc') }}</div>
           </template>
@@ -53,7 +53,7 @@
             <Icon icon="material-symbols-light:close-rounded" width="18" height="18" class="cc-bcc-close" @click.stop="showCc = false; form.ccEmail = []" />
           </template>
         </el-input-tag>
-        <el-input-tag v-if="showBcc" @add-tag="addBccTagChange" tag-type="warning" size="default" v-model="form.bccEmail" class="cc-bcc-input">
+        <el-input-tag v-if="showBcc" ref="bccInputTagRef" :delimiter="/[;；,，]/" @add-tag="addBccTagChange" tag-type="warning" @input="bccInputChange" size="default" v-model="form.bccEmail" class="cc-bcc-input">
           <template #prefix>
             <div class="item-title bcc-title">{{ $t('bcc') }}</div>
           </template>
@@ -63,7 +63,7 @@
         </el-input-tag>
         <el-input v-model="form.subject" :placeholder="t('subject')" />
         <div class="editor-wrapper">
-          <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" />
+          <tinyEditor :def-value="defValue" ref="editor" @change="change" @focus="focusChange" @init="onEditorInit" />
         </div>
       </div>
       <div class="button-item">
@@ -168,6 +168,9 @@ const emailStore = useEmailStore();
 const accountStore = useAccountStore()
 const signatureStore = useSignatureStore();
 const editor = ref({})
+const recipientInputTagRef = ref()
+const ccInputTagRef = ref()
+const bccInputTagRef = ref()
 const userStore = useUserStore();
 const show = ref(false);
 const percent = ref(0)
@@ -252,8 +255,19 @@ function clearSelectContact() {
   contactsTabRef.value.clearSelection();
 }
 
+function clearRecipientNativeInput(inputTagRef) {
+  const inputEl = inputTagRef.value?.$el?.querySelector('input');
+  if (inputEl && inputEl.value) {
+    inputEl.value = '';
+    inputEl.dispatchEvent(new Event('input'));
+  }
+}
+
 function selectChange(value) {
-  form.receiveEmail.push(value)
+  if (value && isEmail(value) && !form.receiveEmail.includes(value)) {
+    form.receiveEmail.push(value)
+  }
+  clearRecipientNativeInput(recipientInputTagRef)
 }
 
 function selectStatusChange(status) {
@@ -265,8 +279,12 @@ const openSelect = () => {
 }
 
 function inputChange(value) {
+  if (!value) {
+    selectRecipientList.value = [];
+    return;
+  }
   const normalized = splitRecipientInput(value);
-  if (value && /[;；]/.test(value) && normalized.length > 0) {
+  if (/[;；,，]/.test(value) && normalized.length > 0) {
     const lastIndex = form.receiveEmail.length > 0 && !isEmail(form.receiveEmail[form.receiveEmail.length - 1])
       ? form.receiveEmail.length - 1
       : form.receiveEmail.length;
@@ -274,6 +292,8 @@ function inputChange(value) {
     normalized.forEach(email => {
       if (!form.receiveEmail.includes(email)) form.receiveEmail.push(email);
     });
+    clearRecipientNativeInput(recipientInputTagRef);
+    selectRecipientList.value = [];
     return;
   }
 
@@ -290,63 +310,68 @@ function inputChange(value) {
 }
 
 function splitRecipientInput(value) {
+  if (Array.isArray(value)) {
+    return Array.from(new Set(value.flatMap(item => splitRecipientInput(item))));
+  }
   return Array.from(new Set(
     String(value || '')
       .split(/[;；,，]+/)
       .map(item => item.trim())
-      .filter(item => item)
-      .filter(item => isEmail(item))
+      .filter(item => item && isEmail(item))
   ));
 }
 
 function addTagChange(val) {
-  const emails = splitRecipientInput(val);
-
-  if (form.receiveEmail.length > 0 && !isEmail(form.receiveEmail[form.receiveEmail.length - 1])) {
-    form.receiveEmail.splice(form.receiveEmail.length - 1, 1);
-  }
-
-  let has = false;
-  emails.forEach(email => {
-    if (!form.receiveEmail.includes(email)) {
-      form.receiveEmail.push(email)
-      has = true
-    }
-  })
-  if (selectStatus && has) openSelect()
+  const cleaned = [];
+  form.receiveEmail.forEach(item => {
+    splitRecipientInput(item).forEach(email => {
+      if (!cleaned.includes(email)) cleaned.push(email);
+    });
+  });
+  form.receiveEmail.splice(0, form.receiveEmail.length, ...cleaned);
+  clearRecipientNativeInput(recipientInputTagRef);
+  if (selectStatus) openSelect()
 }
 
 function addCcTagChange(val) {
-  const emails = Array.from(new Set(
-      val.split(/[,，]/).map(item => item.trim()).filter(item => item)
-  ));
+  const emails = splitRecipientInput(val);
   form.ccEmail.splice(form.ccEmail.length - 1, 1)
   emails.forEach(email => {
-    if (isEmail(email) && !form.ccEmail.includes(email)) {
-      form.ccEmail.push(email)
-    }
+    if (!form.ccEmail.includes(email)) form.ccEmail.push(email)
   })
+  clearRecipientNativeInput(ccInputTagRef);
 }
 
 function addBccTagChange(val) {
-  const emails = Array.from(new Set(
-      val.split(/[,，]/).map(item => item.trim()).filter(item => item)
-  ));
+  const emails = splitRecipientInput(val);
   form.bccEmail.splice(form.bccEmail.length - 1, 1)
   emails.forEach(email => {
-    if (isEmail(email) && !form.bccEmail.includes(email)) {
-      form.bccEmail.push(email)
-    }
+    if (!form.bccEmail.includes(email)) form.bccEmail.push(email)
   })
+  clearRecipientNativeInput(bccInputTagRef);
 }
 
 function ccInputChange(value) {
-  // auto-suggest for CC field (optional, reusing same record)
+  if (/[;；,，]/.test(value || '')) {
+    const emails = splitRecipientInput(value);
+    emails.forEach(email => {
+      if (!form.ccEmail.includes(email)) form.ccEmail.push(email);
+    });
+    clearRecipientNativeInput(ccInputTagRef);
+    return;
+  }
   selectRecipientList.value = writerStore.sendRecipientRecord.filter(item => value && !form.ccEmail.includes(item) && item.startsWith(value)).slice(0, 10);
 }
 
 function bccInputChange(value) {
-  // auto-suggest for BCC field (optional)
+  if (/[;；,，]/.test(value || '')) {
+    const emails = splitRecipientInput(value);
+    emails.forEach(email => {
+      if (!form.bccEmail.includes(email)) form.bccEmail.push(email);
+    });
+    clearRecipientNativeInput(bccInputTagRef);
+    return;
+  }
   selectRecipientList.value = writerStore.sendRecipientRecord.filter(item => value && !form.bccEmail.includes(item) && item.startsWith(value)).slice(0, 10);
 }
 
@@ -541,16 +566,30 @@ function focusChange() {
   if (selectStatus) openSelect()
 }
 
+function onEditorInit() {
+  if (show.value && !form.draftId) {
+    applyDefaultSignature();
+  }
+}
+
 function hasInsertedSignature(content = '') {
-  return /id=["']email-signature-block["']/.test(content) || /data-email-signature=["']inserted["']/.test(content)
+  return /data-email-signature=["']inserted["']/.test(content)
+    || /id=["']email-signature-block["'][^>]*>\s*[\s\S]*?\S[\s\S]*?<\/div>/.test(content)
 }
 
 function applyDefaultSignature() {
+  if (form.draftId) return;
   const def = signatureStore.defaultSignature;
-  if (!def || !String(def.content || '').trim() || !editor.value || hasInsertedSignature(editor.value.getContent())) return;
+  if (!def || !String(def.content || '').trim()) return;
+
+  const currentContent = (editor.value?.getContent ? editor.value.getContent() : defValue.value) || '';
+  if (hasInsertedSignature(currentContent)) return;
+
   nextTick(() => {
-    if (editor.value && !hasInsertedSignature(editor.value.getContent())) {
-      editor.value.replaceSignature(def.content || '');
+    if (form.draftId) return;
+    const freshContent = (editor.value?.getContent ? editor.value.getContent() : '') || '';
+    if (!hasInsertedSignature(freshContent)) {
+      editor.value?.replaceSignature?.(def.content || '');
     }
   });
 }

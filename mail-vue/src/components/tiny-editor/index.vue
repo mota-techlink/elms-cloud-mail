@@ -32,13 +32,14 @@ const props = defineProps({
 
 
 const {locale} = useI18n()
-const emit = defineEmits(['change','focus']);
+const emit = defineEmits(['change','focus','init']);
 const editor = shallowRef(null);
 const isInitialized = ref(false);
 const editorRef = ref(null);
 const showLoading = ref(false);
 const uiStore = useUiStore();
 const settingStore = useSettingStore();
+const pendingSignature = ref(null);
 
 onMounted(() => {
   initTinyMCE();
@@ -49,8 +50,8 @@ onBeforeUnmount(() => {
 });
 
 watch(() => props.defValue, (newValue) => {
-  if (editor.value && editor.value.getContent() !== newValue) {
-    editor.value.setContent(newValue);
+  if (editor.value && isInitialized.value && editor.value.getContent() !== newValue) {
+    editor.value.setContent(newValue || '');
   }
 });
 
@@ -68,7 +69,8 @@ const language = computed(() => {
 })
 
 function clearEditor() {
-  if (editor.value) {
+  pendingSignature.value = null;
+  if (editor.value && isInitialized.value) {
     editor.value.setContent('');
   }
 }
@@ -118,8 +120,13 @@ function initEditor() {
     setup: (ed) => {
       editor.value = ed;
       ed.on('init', () => {
-        ed.setContent(props.defValue);
+        ed.setContent(props.defValue || '');
         isInitialized.value = true;
+        emit('init', ed);
+        if (pendingSignature.value !== null) {
+          replaceSignature(pendingSignature.value);
+          pendingSignature.value = null;
+        }
       });
       ed.on('input change', () => {
         const content = ed.getContent();
@@ -164,22 +171,30 @@ function initEditor() {
 
 function focus() {
   nextTick(() => {
-    editor.value.focus()
-  })
+    if (editor.value) {
+      editor.value.focus();
+    }
+  });
 }
 
 function getContent() {
-  return editor.value.getContent()
+  if (editor.value && isInitialized.value) {
+    return editor.value.getContent();
+  }
+  return props.defValue || '';
 }
 
 function insertContent(content) {
-  if (editor.value) {
+  if (editor.value && isInitialized.value) {
     editor.value.insertContent(content, {format: 'html'});
   }
 }
 
 function replaceSignature(htmlContent) {
-  if (!editor.value) return;
+  if (!editor.value || !isInitialized.value) {
+    pendingSignature.value = htmlContent;
+    return;
+  }
   const dom = editor.value.dom;
   let cleaned = htmlContent || '';
   // 1. Strip inline color/bgcolor from style="..." and style='...'
@@ -234,6 +249,7 @@ function replaceSignature(htmlContent) {
 
 
 function destroyEditor() {
+  isInitialized.value = false;
   if (editor.value) {
     editor.value.destroy();
     editor.value = null;
