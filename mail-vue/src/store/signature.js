@@ -13,14 +13,17 @@ export const useSignatureStore = defineStore('signature', () => {
     const items = ref([]);
     const loaded = ref(false);
 
-    const personal = computed(() => items.value.filter(s => !s.isCompany));
-    const company = computed(() => items.value.filter(s => s.isCompany));
+    const isTruthy = (val) => val === true || Number(val) === 1 || val === '1';
+    const hasContent = (val) => Boolean(String(val || '').trim());
+
+    const personal = computed(() => items.value.filter(s => !isTruthy(s.isCompany)));
+    const company = computed(() => items.value.filter(s => isTruthy(s.isCompany)));
     const defaultSignature = computed(() => {
-        const personalDefault = personal.value.find(s => s.isDefault && String(s.content || '').trim());
+        const personalDefault = personal.value.find(s => isTruthy(s.isDefault) && hasContent(s.content));
         if (personalDefault) return personalDefault;
-        return company.value.find(s => s.isDefault && String(s.content || '').trim()) || null;
+        return company.value.find(s => isTruthy(s.isDefault) && hasContent(s.content)) || null;
     });
-    const publicDefaultSignature = computed(() => company.value.find(s => s.isDefault && String(s.content || '').trim()) || null);
+    const publicDefaultSignature = computed(() => company.value.find(s => isTruthy(s.isDefault) && hasContent(s.content)) || null);
 
     async function fetch(force = false) {
         if (loaded.value && !force) return items.value;
