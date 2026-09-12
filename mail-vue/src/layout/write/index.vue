@@ -177,6 +177,7 @@ const percent = ref(0)
 let percentMessage = null
 let sending = false
 const defValue = ref('')
+const defaultSignatureHandled = ref(false)
 const contactsTabRef = ref({})
 const showContacts = ref(false)
 const mySelect = ref()
@@ -535,6 +536,7 @@ function addRecipientRecord() {
 }
 
 function resetForm() {
+  defaultSignatureHandled.value = false
   form.receiveEmail = []
   form.ccEmail = []
   form.bccEmail = []
@@ -574,17 +576,20 @@ function onEditorInit() {
 
 function hasInsertedSignature(content = '') {
   return /data-email-signature=["']inserted["']/.test(content)
-    || /id=["']email-signature-block["'][^>]*>\s*[\s\S]*?\S[\s\S]*?<\/div>/.test(content)
 }
 
 function applyDefaultSignature() {
-  if (form.draftId) return;
+  if (form.draftId || defaultSignatureHandled.value) return;
   const def = signatureStore.defaultSignature;
   if (!def || !String(def.content || '').trim()) return;
 
   const currentContent = (editor.value?.getContent ? editor.value.getContent() : defValue.value) || '';
-  if (hasInsertedSignature(currentContent)) return;
+  if (hasInsertedSignature(currentContent)) {
+    defaultSignatureHandled.value = true
+    return;
+  }
 
+  defaultSignatureHandled.value = true
   nextTick(() => {
     if (form.draftId) return;
     const freshContent = (editor.value?.getContent ? editor.value.getContent() : '') || '';

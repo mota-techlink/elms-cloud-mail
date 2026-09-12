@@ -28,5 +28,5 @@ export function splitRecipientInput(value = '') {
 }
 
 export function hasSignatureBlockMarkup(content = '') {
-	return /id=["']email-signature-block["']/.test(String(content || '')) || /data-email-signature=["']inserted["']/.test(String(content || ''));
+	return /data-email-signature=["']inserted["']/.test(String(content || ''));
 }
