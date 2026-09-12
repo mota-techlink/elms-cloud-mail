@@ -197,15 +197,16 @@ function replaceSignature(htmlContent) {
   // Find by unique ID — never touches anything outside the signature block
   const existing = dom.select('#email-signature-block');
   if (existing.length > 0) {
+    existing[0].setAttribute('data-email-signature', 'inserted');
     existing[0].innerHTML = cleaned || '';
   } else {
     // First time: insert signature block at end
-    const sigHtml = '<div id="email-signature-block">' + (cleaned || '') + '</div>';
+    const sigHtml = '<div id="email-signature-block" data-email-signature="inserted">' + (cleaned || '') + '</div>';
     editor.value.selection.select(editor.value.getBody(), true);
     editor.value.selection.collapse(false);
     editor.value.insertContent(sigHtml, {format: 'html'});
   }
-  // 3. Forcefully strip colors from signature block via DOM walk
+  // Forcefully strip colors from signature block via DOM walk
   const block = dom.select('#email-signature-block')[0];
   if (block) {
     const walk = (node) => {

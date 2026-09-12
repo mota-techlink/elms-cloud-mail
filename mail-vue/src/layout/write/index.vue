@@ -265,6 +265,17 @@ const openSelect = () => {
 }
 
 function inputChange(value) {
+  const normalized = splitRecipientInput(value);
+  if (value && /[;；]/.test(value) && normalized.length > 0) {
+    const lastIndex = form.receiveEmail.length > 0 && !isEmail(form.receiveEmail[form.receiveEmail.length - 1])
+      ? form.receiveEmail.length - 1
+      : form.receiveEmail.length;
+    form.receiveEmail.splice(lastIndex, form.receiveEmail.length - lastIndex);
+    normalized.forEach(email => {
+      if (!form.receiveEmail.includes(email)) form.receiveEmail.push(email);
+    });
+    return;
+  }
 
   selectRecipientList.value = writerStore.sendRecipientRecord.filter(item => value && !form.receiveEmail.includes(item) && item.startsWith(value)).slice(0, 10);
 
@@ -278,17 +289,26 @@ function inputChange(value) {
 
 }
 
-function addTagChange(val) {
-
-  const emails = Array.from(new Set(
-      val.split(/[,，]/).map(item => item.trim()).filter(item => item)
+function splitRecipientInput(value) {
+  return Array.from(new Set(
+    String(value || '')
+      .split(/[;；,，]+/)
+      .map(item => item.trim())
+      .filter(item => item)
+      .filter(item => isEmail(item))
   ));
+}
 
-  form.receiveEmail.splice(form.receiveEmail.length - 1, 1)
+function addTagChange(val) {
+  const emails = splitRecipientInput(val);
 
-  let has = false
+  if (form.receiveEmail.length > 0 && !isEmail(form.receiveEmail[form.receiveEmail.length - 1])) {
+    form.receiveEmail.splice(form.receiveEmail.length - 1, 1);
+  }
+
+  let has = false;
   emails.forEach(email => {
-    if (isEmail(email) && !form.receiveEmail.includes(email)) {
+    if (!form.receiveEmail.includes(email)) {
       form.receiveEmail.push(email)
       has = true
     }
@@ -521,6 +541,20 @@ function focusChange() {
   if (selectStatus) openSelect()
 }
 
+function hasInsertedSignature(content = '') {
+  return /id=["']email-signature-block["']/.test(content) || /data-email-signature=["']inserted["']/.test(content)
+}
+
+function applyDefaultSignature() {
+  const def = signatureStore.defaultSignature;
+  if (!def || !String(def.content || '').trim() || !editor.value || hasInsertedSignature(editor.value.getContent())) return;
+  nextTick(() => {
+    if (editor.value && !hasInsertedSignature(editor.value.getContent())) {
+      editor.value.replaceSignature(def.content || '');
+    }
+  });
+}
+
 function openForward(email) {
   resetForm();
 
@@ -685,19 +719,13 @@ function open() {
     form.accountId = accountStore.currentAccount.accountId;
     form.name = accountStore.currentAccount.name;
   }
-  // New email: seed template with content area + signature block
+
   if (!defValue.value) {
-    defValue.value = '<div><br><br><br><br><br><br></div><div id="email-signature-block"></div>';
-  } else if (!defValue.value.includes('id="email-signature-block"')) {
-    defValue.value += '<div id="email-signature-block"></div>';
+    defValue.value = '<div><br><br><br><br><br><br></div>';
   }
+
   signatureStore.fetch().then(() => {
-    const def = signatureStore.defaultSignature;
-    if (def && editor.value) {
-      nextTick(() => {
-        editor.value.replaceSignature && editor.value.replaceSignature(def.content || '');
-      });
-    }
+    applyDefaultSignature();
   });
   show.value = true;
   editor.value.focus()

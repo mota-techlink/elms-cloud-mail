@@ -15,7 +15,12 @@ export const useSignatureStore = defineStore('signature', () => {
 
     const personal = computed(() => items.value.filter(s => !s.isCompany));
     const company = computed(() => items.value.filter(s => s.isCompany));
-    const defaultSignature = computed(() => personal.value.find(s => s.isDefault) || null);
+    const defaultSignature = computed(() => {
+        const personalDefault = personal.value.find(s => s.isDefault && String(s.content || '').trim());
+        if (personalDefault) return personalDefault;
+        return company.value.find(s => s.isDefault && String(s.content || '').trim()) || null;
+    });
+    const publicDefaultSignature = computed(() => company.value.find(s => s.isDefault && String(s.content || '').trim()) || null);
 
     async function fetch(force = false) {
         if (loaded.value && !force) return items.value;
@@ -52,5 +57,5 @@ export const useSignatureStore = defineStore('signature', () => {
         await fetch(true);
     }
 
-    return { items, personal, company, defaultSignature, loaded, fetch, add, addCompany, update, remove, setDefault };
+    return { items, personal, company, defaultSignature, publicDefaultSignature, loaded, fetch, add, addCompany, update, remove, setDefault };
 });
