@@ -4,7 +4,7 @@ import { email } from './email/email';
 import userService from './service/user-service';
 import verifyRecordService from './service/verify-record-service';
 import emailService from './service/email-service';
-import kvObjService from './service/kv-obj-service';
+import r2Service from './service/r2-service';
 import oauthService from "./service/oauth-service";
 import analysisService from './service/analysis-service';
 export default {
@@ -26,7 +26,10 @@ export default {
 		}
 
 		 if (['/static/','/attachments/'].some(p => url.pathname.startsWith(p))) {
-			 return await kvObjService.toObjResp( { env }, url.pathname.substring(1));
+			return await r2Service.toObjResp({ env }, decodeURIComponent(url.pathname.substring(1)), {
+				download: ['1', 'true'].includes(url.searchParams.get('download')),
+				fileName: url.searchParams.get('filename')
+			});
 		 }
 
 		const assetResp = await env.assets.fetch(req);
