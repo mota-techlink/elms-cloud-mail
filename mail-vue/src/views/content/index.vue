@@ -82,16 +82,16 @@
             <div class="att-box">
 
               <div class="att-item" v-for="att in email.attList" :key="att.attId">
-                <div class="att-icon" @click="showImage(att.key)">
+                <div class="att-icon" @click="openAtt(att)">
                   <Icon v-bind="getIconByName(att.filename)" />
                 </div>
-                <div class="att-name" @click="showImage(att.key)">
+                <a class="att-name" :href="attDownloadUrl(att)" :download="att.filename || ''" @click.prevent="openAtt(att)">
                   {{ att.filename }}
-                </div>
+                </a>
                 <div class="att-size">{{ formatBytes(att.size) }}</div>
                 <div class="opt-icon att-icon">
-                  <Icon v-if="isImage(att.filename)" icon="hugeicons:view" width="22" height="22" @click="showImage(att.key)"/>
-                  <a :href="cvtR2Url(att.key)" download>
+                  <Icon v-if="isImage(att.filename || att.key)" icon="hugeicons:view" width="22" height="22" @click="openAtt(att)"/>
+                  <a :href="attDownloadUrl(att)" :download="att.filename || ''">
                     <Icon icon="system-uicons:push-down" width="22" height="22"/>
                   </a>
                 </div>
@@ -137,7 +137,7 @@ import {useAccountStore} from "@/store/account.js";
 import {formatDetailDate} from "@/utils/day.js";
 import {starAdd, starCancel} from "@/request/star.js";
 import {getExtName, formatBytes} from "@/utils/file-utils.js";
-import {cvtR2Url,toOssDomain} from "@/utils/convert.js";
+import {ossBase,ossUrl,ossDownloadUrl} from "@/utils/convert.js";
 import {getIconByName} from "@/utils/icon-utils.js";
 import {useSettingStore} from "@/store/setting.js";
 import {allEmailDelete} from "@/request/all-email.js";
@@ -280,13 +280,37 @@ function toMessage(message) {
 
 function formatImage(content) {
   content = content || '';
-  const domain = settingStore.settings.r2Domain;
-  return  content.replace(/{{domain}}/g, toOssDomain(domain) + '/');
+  return  content.replace(/{{domain}}/g, ossBase());
+}
+
+function attDownloadUrl(att) {
+  return ossDownloadUrl(att.key, att.filename);
+}
+
+function downloadAtt(att) {
+  const url = attDownloadUrl(att);
+  if (!url) return;
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = att.filename || '';
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function openAtt(att) {
+  if (isImage(att.filename || att.key)) {
+    showImage(att.key);
+    return;
+  }
+  downloadAtt(att);
 }
 
 function showImage(key) {
   if (!isImage(key)) return;
-  const url = cvtR2Url(key)
+  const url = ossUrl(key);
+  if (!url) return;
   srcList.length = 0
   srcList.push(url)
   showPreview.value = true
@@ -485,6 +509,9 @@ const handleDelete = () => {
         }
 
         .att-name {
+          align-self: center;
+          color: inherit;
+          text-decoration: none;
           margin-left: 8px;
           margin-right: 8px;
           white-space: nowrap;
